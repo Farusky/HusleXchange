@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  --bg-main: #0F172A;
+  --bg-card: #1E293B;
+  --bg-inner: #0F172A;
+  --text-main: #E2E8F0;
+  --text-muted: #94A3B8;
+  --border-color: rgba(255, 255, 255, 0.05);
+}
+
+:root.light {
+  --bg-main: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --bg-inner: #F1F5F9;
+  --text-main: #1E293B;
+  --text-muted: #64748B;
+  --border-color: rgba(0, 0, 0, 0.05);
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}

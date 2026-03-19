@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user details and skills.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "skillsOffered": { "type": "array", "items": { "type": "string" } },
+        "skillsWanted": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["uid", "name", "email", "phone", "skillsOffered", "skillsWanted", "createdAt"]
+    },
+    "Post": {
+      "title": "Skill Exchange Post",
+      "description": "A post offering and requesting skills.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userRating": { "type": "number" },
+        "userRatingCount": { "type": "number" },
+        "offer": { "type": "string" },
+        "need": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "phone": { "type": "string" }
+      },
+      "required": ["id", "userId", "userName", "offer", "need", "createdAt", "phone"]
+    },
+    "Exchange": {
+      "title": "Skill Exchange",
+      "description": "An exchange agreement between two users.",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string" },
+        "requesterId": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "providerId": { "type": "string" },
+        "providerName": { "type": "string" },
+        "offer": { "type": "string" },
+        "need": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed", "cancelled"] },
+        "createdAt": { "type": "number" },
+        "completedAt": { "type": "number" },
+        "ratedByRequester": { "type": "boolean" },
+        "ratedByProvider": { "type": "boolean" }
+      },
+      "required": ["postId", "requesterId", "requesterName", "providerId", "providerName", "offer", "need", "status", "createdAt"]
+    },
+    "Review": {
+      "title": "User Review",
+      "description": "A rating and review for a user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "exchangeId": { "type": "string" },
+        "fromId": { "type": "string" },
+        "fromName": { "type": "string" },
+        "toId": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "exchangeId", "fromId", "fromName", "toId", "rating", "comment", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile documents."
+    },
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Skill exchange posts."
+    },
+    "/exchanges/{exchangeId}": {
+      "schema": "Exchange",
+      "description": "Skill exchange agreements."
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "User reviews and ratings."
+    }
+  }
+}

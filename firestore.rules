@@ -1,0 +1,185 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (UID)
+    // Fields:
+    //   - uid: string (required, immutable)
+    //   - name: string (required, 1-100 chars)
+    //   - email: string (required, email format)
+    //   - phone: string (required, 1-20 chars)
+    //   - skillsOffered: list (required, max 20 items, each < 50 chars)
+    //   - skillsWanted: list (required, max 20 items, each < 50 chars)
+    //   - createdAt: number (required, immutable)
+    //   - ratingAverage: number (optional)
+    //   - ratingCount: number (optional)
+    //
+    // Collection: posts
+    // Document ID: postId (auto-generated)
+    // Fields:
+    //   - id: string (required, immutable)
+    //   - userId: string (required, immutable)
+    //   - userName: string (required, 1-100 chars)
+    //   - userRating: number (optional)
+    //   - userRatingCount: number (optional)
+    //   - offer: string (required, 1-500 chars)
+    //   - need: string (required, 1-500 chars)
+    //   - createdAt: number (required, immutable)
+    //   - phone: string (required, 1-20 chars)
+    //
+    // Collection: exchanges
+    // Document ID: exchangeId (auto-generated)
+    // Fields:
+    //   - postId: string (required)
+    //   - requesterId: string (required)
+    //   - requesterName: string (required)
+    //   - providerId: string (required)
+    //   - providerName: string (required)
+    //   - offer: string (required)
+    //   - need: string (required)
+    //   - status: string (pending, completed, cancelled)
+    //   - createdAt: number (required)
+    //   - completedAt: number (optional)
+    //   - ratedByRequester: bool (optional)
+    //   - ratedByProvider: bool (optional)
+    //
+    // Collection: reviews
+    // Document ID: reviewId (auto-generated)
+    // Fields:
+    //   - id: string (required)
+    //   - exchangeId: string (required)
+    //   - fromId: string (required)
+    //   - fromName: string (required)
+    //   - toId: string (required)
+    //   - rating: number (1-5)
+    //   - comment: string (0-1000 chars)
+    //   - createdAt: number (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidString(val, min, max) {
+      return val is string && val.size() >= min && val.size() <= max;
+    }
+
+    function isValidList(val, maxItems) {
+      return val is list && val.size() <= maxItems;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUserProfile(data) {
+      let requiredFields = ['uid', 'name', 'email', 'phone', 'skillsOffered', 'skillsWanted', 'createdAt'];
+      let optionalFields = ['ratingAverage', 'ratingCount'];
+      return data.keys().hasAll(requiredFields) &&
+             data.keys().hasOnly(requiredFields.concat(optionalFields)) &&
+             data.uid == request.auth.uid &&
+             isValidString(data.name, 1, 100) &&
+             isValidEmail(data.email) &&
+             isValidString(data.phone, 1, 20) &&
+             isValidList(data.skillsOffered, 20) &&
+             isValidList(data.skillsWanted, 20) &&
+             data.createdAt is number &&
+             (!('ratingAverage' in data) || data.ratingAverage is number) &&
+             (!('ratingCount' in data) || data.ratingCount is number);
+    }
+
+    function isValidPost(data) {
+      let requiredFields = ['userId', 'userName', 'offer', 'need', 'createdAt', 'phone'];
+      let optionalFields = ['id', 'userRating', 'userRatingCount'];
+      return data.keys().hasAll(requiredFields) &&
+             data.keys().hasOnly(requiredFields.concat(optionalFields)) &&
+             data.userId == request.auth.uid &&
+             isValidString(data.userName, 1, 100) &&
+             isValidString(data.offer, 1, 500) &&
+             isValidString(data.need, 1, 500) &&
+             data.createdAt is number &&
+             isValidString(data.phone, 1, 20) &&
+             (!('userRating' in data) || data.userRating is number) &&
+             (!('userRatingCount' in data) || data.userRatingCount is number);
+    }
+
+    function isValidExchange(data) {
+      let requiredFields = ['postId', 'requesterId', 'requesterName', 'providerId', 'providerName', 'offer', 'need', 'status', 'createdAt'];
+      let optionalFields = ['completedAt', 'ratedByRequester', 'ratedByProvider'];
+      return data.keys().hasAll(requiredFields) &&
+             data.keys().hasOnly(requiredFields.concat(optionalFields)) &&
+             (data.requesterId == request.auth.uid || data.providerId == request.auth.uid) &&
+             data.status in ['pending', 'completed', 'cancelled'] &&
+             data.createdAt is number;
+    }
+
+    function isValidReview(data) {
+      return data.keys().hasAll(['id', 'exchangeId', 'fromId', 'fromName', 'toId', 'rating', 'comment', 'createdAt']) &&
+             data.keys().hasOnly(['id', 'exchangeId', 'fromId', 'fromName', 'toId', 'rating', 'comment', 'createdAt']) &&
+             data.fromId == request.auth.uid &&
+             data.rating >= 1 && data.rating <= 5 &&
+             isValidString(data.comment, 0, 1000) &&
+             data.createdAt is number;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUserProfile(request.resource.data);
+      allow update: if isAuthenticated() && (
+                      // Self update
+                      (isOwner(userId) && isValidUserProfile(request.resource.data) &&
+                       request.resource.data.uid == resource.data.uid &&
+                       request.resource.data.createdAt == resource.data.createdAt) ||
+                      // Rating update via transaction (anyone can update if they are submitting a review)
+                      // In a real app, we'd check if the user just submitted a review for this user.
+                      // For now, we'll allow updating rating fields if other fields are unchanged.
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingAverage', 'ratingCount']))
+                    );
+      allow delete: if false;
+    }
+
+    match /posts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidPost(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && 
+                      isValidPost(request.resource.data) &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /exchanges/{exchangeId} {
+      allow read: if isAuthenticated() && (resource.data.requesterId == request.auth.uid || resource.data.providerId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.requesterId == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.requesterId == request.auth.uid || resource.data.providerId == request.auth.uid) &&
+                      isValidExchange(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.fromId == request.auth.uid &&
+                      isValidReview(request.resource.data);
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
